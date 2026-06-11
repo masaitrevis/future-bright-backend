@@ -417,7 +417,9 @@ app.get("/api/mpesa/status/:checkoutRequestId", (req, res) => {
   const { checkoutRequestId } = req.params;
 
   db.get(
-    "SELECT * FROM orders WHERE checkout_request_id = ?",
+    `SELECT o.*, p.file_path, p.category, p.title FROM orders o
+     JOIN products p ON o.product_id = p.id
+     WHERE o.checkout_request_id = ?`,
     [checkoutRequestId],
     (err, order) => {
       if (err || !order) {
@@ -432,6 +434,9 @@ app.get("/api/mpesa/status/:checkoutRequestId", (req, res) => {
           order.status === "paid"
             ? `${req.protocol}://${req.get("host")}/api/download/${order.download_token}`
             : null,
+        hasFile: !!order.file_path,
+        category: order.category,
+        productTitle: order.title,
       });
     }
   );
@@ -443,7 +448,7 @@ app.get("/api/download/:token", (req, res) => {
   const { token } = req.params;
 
   db.get(
-    `SELECT o.*, p.file_path, p.title FROM orders o
+    `SELECT o.*, p.file_path, p.category, p.title FROM orders o
      JOIN products p ON o.product_id = p.id
      WHERE o.download_token = ? AND o.status = 'paid'`,
     [token],
@@ -454,6 +459,18 @@ app.get("/api/download/:token", (req, res) => {
 
       if (new Date() > new Date(order.download_expires_at)) {
         return res.status(403).json({ error: "Download link has expired" });
+      }
+
+      // For services without files, return confirmation instead of download
+      if (!order.file_path) {
+        return res.json({
+          type: "service",
+          message: "Payment confirmed!",
+          productTitle: order.title,
+          category: order.category,
+          mpesaReceipt: order.mpesa_receipt,
+          details: "You will receive a confirmation call/email shortly with next steps.",
+        });
       }
 
       const filePath = path.join(__dirname, order.file_path);
