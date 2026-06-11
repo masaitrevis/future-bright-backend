@@ -57,7 +57,7 @@ function initializeDatabase() {
         price INTEGER NOT NULL,
         cover_image TEXT,
         file_path TEXT,
-        category TEXT DEFAULT 'book',
+        category TEXT DEFAULT 'service',
         status TEXT DEFAULT 'active',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -81,7 +81,7 @@ function initializeDatabase() {
       )
     `);
 
-    // Admin users table
+    // Admin users table - with callback to ensure admin is created AFTER table exists
     db.run(`
       CREATE TABLE IF NOT EXISTS admin_users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,28 +89,32 @@ function initializeDatabase() {
         password TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
-    `);
-  });
-
-  // Ensure admin user exists after tables are created
-  db.get("SELECT * FROM admin_users WHERE username = ?", ["admin"], (err, row) => {
-    if (err) {
-      console.error("Error checking admin user:", err);
-      return;
-    }
-    if (!row) {
-      const defaultPassword = bcrypt.hashSync("admin123", 10);
-      db.run(
-        "INSERT INTO admin_users (username, password) VALUES (?, ?)",
-        ["admin", defaultPassword],
-        (err) => {
-          if (err) console.error("Error creating admin user:", err);
-          else console.log("Admin user created: admin / admin123");
+    `, [], function(err) {
+      if (err) {
+        console.error("Error creating admin_users table:", err);
+        return;
+      }
+      // Now safe to check/insert admin user
+      db.get("SELECT * FROM admin_users WHERE username = ?", ["admin"], (err, row) => {
+        if (err) {
+          console.error("Error checking admin user:", err);
+          return;
         }
-      );
-    } else {
-      console.log("Admin user already exists");
-    }
+        if (!row) {
+          const defaultPassword = bcrypt.hashSync("admin123", 10);
+          db.run(
+            "INSERT INTO admin_users (username, password) VALUES (?, ?)",
+            ["admin", defaultPassword],
+            (err) => {
+              if (err) console.error("Error creating admin user:", err);
+              else console.log("Admin user created: admin / admin123");
+            }
+          );
+        } else {
+          console.log("Admin user already exists");
+        }
+      });
+    });
   });
 }
 
