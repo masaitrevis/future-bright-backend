@@ -306,8 +306,6 @@ app.post("/api/mpesa/stkpush", async (req, res) => {
       ? `254${phoneNumber.slice(1)}`
       : phoneNumber;
 
-    const checkoutRequestId = uuidv4();
-
     const response = await axios.post(
       `${getBaseUrl()}/mpesa/stkpush/v1/processrequest`,
       {
@@ -325,6 +323,9 @@ app.post("/api/mpesa/stkpush", async (req, res) => {
       },
       { headers: { Authorization: `Bearer ${token}` } }
     );
+
+    // Use the REAL CheckoutRequestID from Safaricom
+    const checkoutRequestId = response.data.CheckoutRequestID;
 
     // Save order
     const downloadToken = uuidv4();
