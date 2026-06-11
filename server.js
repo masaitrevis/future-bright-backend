@@ -213,7 +213,7 @@ app.post(
     db.run(
       `INSERT INTO products (title, author, description, price, cover_image, file_path, category)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [title, author, description, price, coverImage, filePath, category || "book"],
+      [title, author, description, price, coverImage, filePath, category || "service"],
       function (err) {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ id: this.lastID, message: "Product created successfully" });
