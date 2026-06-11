@@ -89,15 +89,28 @@ function initializeDatabase() {
         password TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
-    `, [], (err) => {
-      if (err) return;
-      // Insert default admin if not exists
+    `);
+  });
+
+  // Ensure admin user exists after tables are created
+  db.get("SELECT * FROM admin_users WHERE username = ?", ["admin"], (err, row) => {
+    if (err) {
+      console.error("Error checking admin user:", err);
+      return;
+    }
+    if (!row) {
       const defaultPassword = bcrypt.hashSync("admin123", 10);
       db.run(
-        `INSERT OR IGNORE INTO admin_users (username, password) VALUES (?, ?)`,
-        ["admin", defaultPassword]
+        "INSERT INTO admin_users (username, password) VALUES (?, ?)",
+        ["admin", defaultPassword],
+        (err) => {
+          if (err) console.error("Error creating admin user:", err);
+          else console.log("Admin user created: admin / admin123");
+        }
       );
-    });
+    } else {
+      console.log("Admin user already exists");
+    }
   });
 }
 
@@ -469,7 +482,30 @@ app.get("/api/orders", authenticateToken, (req, res) => {
 // ============ HEALTH CHECK ============
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  db.get("SELECT * FROM admin_users WHERE username = ?", ["admin"], (err, row) => {
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      adminExists: !!row,
+      adminUsername: row ? row.username : null,
+    });
+  });
+});
+
+// Seed admin user (idempotent - safe to call multiple times)
+app.post("/api/seed", (req, res) => {
+  const defaultPassword = bcrypt.hashSync("admin123", 10);
+  db.run(
+    "INSERT OR REPLACE INTO admin_users (id, username, password) VALUES ((SELECT id FROM admin_users WHERE username = ?), ?, ?)",
+    ["admin", "admin", defaultPassword],
+    (err) => {
+      if (err) {
+        console.error("Seed error:", err);
+        return res.status(500).json({ error: "Failed to seed admin user" });
+      }
+      res.json({ message: "Admin user seeded: admin / admin123" });
+    }
+  );
 });
 
 // Start server
